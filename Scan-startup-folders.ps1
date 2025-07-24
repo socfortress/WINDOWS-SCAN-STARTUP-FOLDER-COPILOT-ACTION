@@ -1,4 +1,3 @@
-
 [CmdletBinding()]
 param(
   [int]$MaxWaitSeconds = 300,
@@ -12,10 +11,7 @@ $LogMaxKB = 100
 $LogKeep = 5
 
 function Write-Log {
-  param(
-    [string]$Message,
-    [ValidateSet('INFO','WARN','ERROR','DEBUG')]$Level = 'INFO'
-  )
+  param([string]$Message, [ValidateSet('INFO','WARN','ERROR','DEBUG')]$Level = 'INFO')
   $ts = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss.fff')
   $line = "[$ts][$Level] $Message"
   switch ($Level) {
@@ -52,6 +48,17 @@ function Test-DigitalSignature {
 }
 
 Rotate-Log
+
+try {
+  if (Test-Path $ARLog) {
+    Remove-Item -Path $ARLog -Force -ErrorAction Stop
+  }
+  New-Item -Path $ARLog -ItemType File -Force | Out-Null
+  Write-Log "Active response log cleared for fresh run."
+} catch {
+  Write-Log "Failed to clear ${ARLog}: $($_.Exception.Message)" 'WARN'
+}
+
 $runStart = Get-Date
 Write-Log "=== SCRIPT START : Scan Startup & Run Keys ==="
 
@@ -69,28 +76,25 @@ try {
       Get-ChildItem $loc.path -ErrorAction SilentlyContinue | ForEach-Object {
         $Items += [PSCustomObject]@{
           location = "Startup Folder"
-          path     = $_.FullName
-          target   = $_.FullName
+          path = $_.FullName
+          target = $_.FullName
           flagged_reasons = @()
         }
       }
-    }
-    elseif ($loc.type -eq "Registry" -and (Test-Path $loc.path)) {
+    } elseif ($loc.type -eq "Registry" -and (Test-Path $loc.path)) {
       $props = Get-ItemProperty $loc.path -ErrorAction SilentlyContinue
-      $props.PSObject.Properties |
-        Where-Object {
-          $_.MemberType -eq 'NoteProperty' -and
-          $_.Name -notmatch '^PS(ParentPath|ChildName|Path|Drive|Provider)$' -and
-          $_.Value -is [string]
-        } |
-        ForEach-Object {
-          $Items += [PSCustomObject]@{
-            location = "Run Registry"
-            path     = "$($loc.path)\$($_.Name)"
-            target   = $_.Value
-            flagged_reasons = @()
-          }
+      $props.PSObject.Properties | Where-Object {
+        $_.MemberType -eq 'NoteProperty' -and
+        $_.Name -notmatch '^PS(ParentPath|ChildName|Path|Drive|Provider)$' -and
+        $_.Value -is [string]
+      } | ForEach-Object {
+        $Items += [PSCustomObject]@{
+          location = "Run Registry"
+          path = "$($loc.path)\$($_.Name)"
+          target = $_.Value
+          flagged_reasons = @()
         }
+      }
     }
   }
 
@@ -108,26 +112,26 @@ try {
     }
   }
 
-  $timestamp = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ss.fffffffK")
+  $timestamp = (Get-Date).ToString("o")
   $FullReport = [pscustomobject]@{
-    host       = $HostName
-    timestamp  = $timestamp
-    action     = "scan_startup_runkeys"
+    host = $HostName
+    timestamp = $timestamp
+    action = "scan_startup_runkeys"
     item_count = $Items.Count
-    items      = $Items
+    items = $Items
   }
   $FlaggedReport = [pscustomobject]@{
-    host          = $HostName
-    timestamp     = $timestamp
-    action        = "scan_startup_runkeys_flagged"
+    host = $HostName
+    timestamp = $timestamp
+    action = "scan_startup_runkeys_flagged"
     flagged_count = ($Items | Where-Object { $_.flagged_reasons.Count -gt 0 }).Count
     flagged_items = $Items | Where-Object { $_.flagged_reasons.Count -gt 0 }
   }
 
-  $FullReport | ConvertTo-Json -Compress -Depth 5 | Out-File -FilePath $ARLog -Append -Encoding ascii -Width 2000
-  $FlaggedReport | ConvertTo-Json -Compress -Depth 5 | Out-File -FilePath $ARLog -Append -Encoding ascii -Width 2000
+  $FullReport | ConvertTo-Json -Depth 5 -Compress | Out-File -FilePath $ARLog -Append -Encoding ascii -Width 2000
+  $FlaggedReport | ConvertTo-Json -Depth 5 -Compress | Out-File -FilePath $ARLog -Append -Encoding ascii -Width 2000
 
-  Write-Log "JSON reports (full + flagged) appended to $ARLog" 'INFO'
+  Write-Log "JSON reports (full + flagged) written to $ARLog"
   Write-Host "`n=== Startup & Run Key Scan Report ==="
   Write-Host "Host: $HostName"
   Write-Host "Total Items Found: $($Items.Count)"
@@ -135,8 +139,7 @@ try {
   if ($FlaggedReport.flagged_count -gt 0) {
     $FlaggedReport.flagged_items | Select-Object location, path, target | Format-Table -AutoSize
   }
-}
-catch {
+} catch {
   Write-Log $_.Exception.Message 'ERROR'
   $errorLog = [pscustomobject]@{
     timestamp = (Get-Date).ToString('o')
@@ -146,8 +149,7 @@ catch {
     error = $_.Exception.Message
   }
   $errorLog | ConvertTo-Json -Compress | Out-File -FilePath $ARLog -Append -Encoding ascii -Width 2000
-}
-finally {
+} finally {
   $dur = [int]((Get-Date) - $runStart).TotalSeconds
   Write-Log "=== SCRIPT END : duration ${dur}s ==="
 }
