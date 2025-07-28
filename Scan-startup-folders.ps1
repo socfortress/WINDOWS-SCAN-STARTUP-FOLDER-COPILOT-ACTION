@@ -119,6 +119,7 @@ try {
     action = "scan_startup_runkeys"
     item_count = $Items.Count
     items = $Items
+    copilot_soar = $true
   }
   $FlaggedReport = [pscustomobject]@{
     host = $HostName
