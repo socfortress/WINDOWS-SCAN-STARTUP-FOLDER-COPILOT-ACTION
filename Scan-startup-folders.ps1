@@ -148,6 +148,7 @@ try {
     action = "scan_startup_runkeys_error"
     status = "error"
     error = $_.Exception.Message
+    copilot_soar = $true
   }
   $errorLog | ConvertTo-Json -Compress | Out-File -FilePath $ARLog -Append -Encoding ascii -Width 2000
 } finally {
