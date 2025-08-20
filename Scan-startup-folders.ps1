@@ -119,7 +119,7 @@ try {
     action = "scan_startup_runkeys"
     item_count = $Items.Count
     items = $Items
-    copilot_soar = $true
+    copilot_action = $true
   }
   $FlaggedReport = [pscustomobject]@{
     host = $HostName
@@ -127,6 +127,7 @@ try {
     action = "scan_startup_runkeys_flagged"
     flagged_count = ($Items | Where-Object { $_.flagged_reasons.Count -gt 0 }).Count
     flagged_items = $Items | Where-Object { $_.flagged_reasons.Count -gt 0 }
+    copilot_action = $true
   }
 
   $FullReport | ConvertTo-Json -Depth 5 -Compress | Out-File -FilePath $ARLog -Append -Encoding ascii -Width 2000
@@ -148,10 +149,11 @@ try {
     action = "scan_startup_runkeys_error"
     status = "error"
     error = $_.Exception.Message
-    copilot_soar = $true
+    copilot_action = $true
   }
   $errorLog | ConvertTo-Json -Compress | Out-File -FilePath $ARLog -Append -Encoding ascii -Width 2000
 } finally {
   $dur = [int]((Get-Date) - $runStart).TotalSeconds
   Write-Log "=== SCRIPT END : duration ${dur}s ==="
 }
+
