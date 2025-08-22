@@ -49,23 +49,13 @@ function Test-DigitalSignature {
 
 Rotate-Log
 
-try {
-  if (Test-Path $ARLog) {
-    Remove-Item -Path $ARLog -Force -ErrorAction Stop
-  }
-  New-Item -Path $ARLog -ItemType File -Force | Out-Null
-  Write-Log "Active response log cleared for fresh run."
-} catch {
-  Write-Log "Failed to clear ${ARLog}: $($_.Exception.Message)" 'WARN'
-}
-
 $runStart = Get-Date
 Write-Log "=== SCRIPT START : Scan Startup & Run Keys ==="
 
 try {
   $Locations = @(
-    @{ type="Folder"; path="$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup" },
-    @{ type="Folder"; path="$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Startup" },
+    @{ type="Folder";   path="$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup" },
+    @{ type="Folder";   path="$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Startup" },
     @{ type="Registry"; path="HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" },
     @{ type="Registry"; path="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" }
   )
@@ -113,37 +103,58 @@ try {
   }
 
   $timestamp = (Get-Date).ToString("o")
-  $FullReport = [pscustomobject]@{
-    host = $HostName
-    timestamp = $timestamp
-    action = "scan_startup_runkeys"
-    item_count = $Items.Count
-    items = $Items
+  $flaggedOnly = $Items | Where-Object { $_.flagged_reasons.Count -gt 0 }
+
+  $lines = @()
+  $lines += ([pscustomobject]@{
+    timestamp     = $timestamp
+    host          = $HostName
+    action        = "scan_startup_runkeys_summary"
+    item_count    = $Items.Count
+    flagged_count = $flaggedOnly.Count
     copilot_action = $true
-  }
-  $FlaggedReport = [pscustomobject]@{
-    host = $HostName
-    timestamp = $timestamp
-    action = "scan_startup_runkeys_flagged"
-    flagged_count = ($Items | Where-Object { $_.flagged_reasons.Count -gt 0 }).Count
-    flagged_items = $Items | Where-Object { $_.flagged_reasons.Count -gt 0 }
-    copilot_action = $true
+  } | ConvertTo-Json -Compress -Depth 3)
+
+  foreach ($it in $Items) {
+    $lines += ([pscustomobject]@{
+      timestamp      = $timestamp
+      host           = $HostName
+      action         = "scan_startup_runkeys"
+      location       = $it.location
+      path           = $it.path
+      target         = $it.target
+      flagged        = $it.flagged_reasons.Count -gt 0
+      reasons        = if ($it.flagged_reasons.Count) { ($it.flagged_reasons -join ', ') } else { $null }
+      copilot_action = $true
+    } | ConvertTo-Json -Compress -Depth 4)
   }
 
-  $FullReport | ConvertTo-Json -Depth 5 -Compress | Out-File -FilePath $ARLog -Append -Encoding ascii -Width 2000
-  $FlaggedReport | ConvertTo-Json -Depth 5 -Compress | Out-File -FilePath $ARLog -Append -Encoding ascii -Width 2000
+  $ndjson = [string]::Join("`n", $lines)
+  $tempFile = "$env:TEMP\arlog.tmp"
+  Set-Content -Path $tempFile -Value $ndjson -Encoding ascii -Force
 
-  Write-Log "JSON reports (full + flagged) written to $ARLog"
+  $recordCount = $lines.Count
+  try {
+    Move-Item -Path $tempFile -Destination $ARLog -Force
+    Write-Log "Wrote $recordCount NDJSON record(s) to $ARLog" 'INFO'
+  } catch {
+    Move-Item -Path $tempFile -Destination "$ARLog.new" -Force
+    Write-Log "ARLog locked; wrote to $($ARLog).new" 'WARN'
+  }
+
   Write-Host "`n=== Startup & Run Key Scan Report ==="
   Write-Host "Host: $HostName"
   Write-Host "Total Items Found: $($Items.Count)"
-  Write-Host "Flagged Items: $($FlaggedReport.flagged_count)"
-  if ($FlaggedReport.flagged_count -gt 0) {
-    $FlaggedReport.flagged_items | Select-Object location, path, target | Format-Table -AutoSize
+  Write-Host "Flagged Items: $($flaggedOnly.Count)"
+  if ($flaggedOnly.Count -gt 0) {
+    $flaggedOnly | Select-Object location, path, target | Format-Table -AutoSize
+  } else {
+    Write-Host "No suspicious startup items detected."
   }
-} catch {
+}
+catch {
   Write-Log $_.Exception.Message 'ERROR'
-  $errorLog = [pscustomobject]@{
+  $errorObj = [pscustomobject]@{
     timestamp = (Get-Date).ToString('o')
     host = $HostName
     action = "scan_startup_runkeys_error"
@@ -151,9 +162,18 @@ try {
     error = $_.Exception.Message
     copilot_action = $true
   }
-  $errorLog | ConvertTo-Json -Compress | Out-File -FilePath $ARLog -Append -Encoding ascii -Width 2000
-} finally {
+  $ndjson = ($errorObj | ConvertTo-Json -Compress -Depth 3)
+  $tempFile = "$env:TEMP\arlog.tmp"
+  Set-Content -Path $tempFile -Value $ndjson -Encoding ascii -Force
+  try {
+    Move-Item -Path $tempFile -Destination $ARLog -Force
+    Write-Log "Error JSON written to $ARLog" 'INFO'
+  } catch {
+    Move-Item -Path $tempFile -Destination "$ARLog.new" -Force
+    Write-Log "ARLog locked; wrote error to $($ARLog).new" 'WARN'
+  }
+}
+finally {
   $dur = [int]((Get-Date) - $runStart).TotalSeconds
   Write-Log "=== SCRIPT END : duration ${dur}s ==="
 }
-
