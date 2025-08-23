@@ -1,5 +1,5 @@
 {
-  "copilot_action_name": "WINDOWS-SCAN-STARTUP-FOLDER-ACTIVERESPONSE",
+  "copilot_action_name": "WINDOWS-SCAN-STARTUP-FOLDER-COPILOT-ACTION",
   "description": "Scans Startup folders and Run registry keys (HKCU/HKLM) to inventory autoruns, flagging items in user/AppData/Temp locations and unsigned executables. Outputs NDJSON (summary + per-item) and writes atomically to the Active Response log with .new fallback.",
   "technology": "Windows",
   "icon": "windows",
