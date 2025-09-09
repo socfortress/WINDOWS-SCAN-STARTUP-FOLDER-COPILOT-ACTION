@@ -1,33 +1,10 @@
 {
   "copilot_action_name": "WINDOWS-SCAN-STARTUP-FOLDER-COPILOT-ACTION",
-  "description": "Scans Startup folders and Run registry keys (HKCU/HKLM) to inventory autoruns, flagging items in user/AppData/Temp locations and unsigned executables. Outputs NDJSON (summary + per-item) and writes atomically to the Active Response log with .new fallback.",
+  "description": "Scans Startup folders and HKCU/HKLM Run registry keys to inventory autoruns, highlighting entries in user/AppData/Temp locations and unsigned executables. Produces structured NDJSON with a summary and per-item details.",
   "technology": "Windows",
   "icon": "windows",
-  "script_parameters": [
-    {
-      "name": "MaxWaitSeconds",
-      "type": "integer",
-      "required": false,
-      "description": "Optional max wait/timeout budget for operations.",
-      "default": 300
-    },
-    {
-      "name": "LogPath",
-      "type": "string",
-      "required": false,
-      "description": "Path to the rotating human-readable script log.",
-      "default": "%TEMP%/Scan-Startup-Folders.log"
-    },
-    {
-      "name": "ARLog",
-      "type": "string",
-      "required": false,
-      "description": "Active Response NDJSON output path (atomic overwrite; falls back to .new if locked).",
-      "default": "C:\\Program Files (x86)\\ossec-agent\\active-response\\active-responses.log"
-    }
-  ],
-  "repo_url": "https://raw.githubusercontent.com/socfortress/WINDOWS-SCAN-STARTUP-FOLDER-COPILOT-ACTION/refs/heads/main",
+  "repo_url": "https://raw.githubusercontent.com/socfortress/WINDOWS-SCAN-STARTUP-FOLDER-COPILOT-ACTION/refs/heads/main/Scan-startup-folders.ps1",
   "script_name": "Scan-startup-folders.ps1",
   "version": "1.0.0",
-  "last_updated": "2025-08-22T00:00:00Z"
+  "last_updated": "2025-09-09T00:00:00Z"
 }
